@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Temporal Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            temporal: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans" x-data="temporalDashboard()" x-init="init()">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <!-- Temporal Logo Icon -->
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">Temporal Manager</span>
+          <span class="ml-2 text-xs text-slate-400 font-mono hidden sm:inline-block">Web UI</span>
+        </div>
+      </div>
+
+      <!-- Center / Status Badge -->
+      <div class="flex items-center space-x-3">
+        <button @click="openConfigModal()" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg border text-sm transition-colors duration-150"
+          :class="status.connected ? 'bg-slate-800/80 border-emerald-500/30 text-emerald-300 hover:bg-slate-800' : 'bg-rose-950/40 border-rose-500/40 text-rose-300 hover:bg-rose-900/50'">
+          <span class="relative flex h-2.5 w-2.5">
+            <span x-show="status.connected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5" :class="status.connected ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+          </span>
+          <span class="font-medium" x-text="status.connected ? (status.host + ' (' + status.namespace + ')') : 'Не подключено'"></span>
+          <span x-show="status.tls_enabled" class="text-[10px] bg-purple-900/60 text-purple-300 px-1.5 py-0.5 rounded font-mono">TLS</span>
+          <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right Action Buttons -->
+      <div class="flex items-center space-x-3">
+        <!-- Auto Refresh -->
+        <div class="flex items-center space-x-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs">
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <select x-model="autoRefreshInterval" @change="setupAutoRefresh()" class="bg-transparent text-slate-300 focus:outline-none cursor-pointer">
+            <option value="0" class="bg-slate-900">Автообновление: выкл</option>
+            <option value="5" class="bg-slate-900">Каждые 5 сек</option>
+            <option value="10" class="bg-slate-900">Каждые 10 сек</option>
+            <option value="30" class="bg-slate-900">Каждые 30 сек</option>
+          </select>
+        </div>
+
+        <!-- Manual Refresh Button -->
+        <button @click="fetchWorkflows()" :disabled="loading" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Обновить">
+          <svg class="w-4 h-4" :class="{'animate-spin text-purple-400': loading}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+
+        <!-- Start Workflow Button -->
+        <button @click="openStartModal()" class="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium px-4 py-2 rounded-lg shadow-lg shadow-purple-600/30 transition text-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Запустить воркфлоу</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Disconnected Banner -->
+  <div x-show="!status.connected" x-cloak class="bg-rose-950/80 border-b border-rose-900 px-4 py-3 text-center text-rose-200 text-sm flex items-center justify-center space-x-3">
+    <svg class="w-5 h-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <span>Нет связи с сервером Temporal. Нажмите для настройки хоста и сертификатов TLS:</span>
+    <button @click="openConfigModal()" class="font-bold underline text-white hover:text-rose-100">
+      Настроить подключение
+    </button>
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Metrics Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Всего воркфлоу</div>
+        <div class="mt-2 text-2xl font-bold text-white" x-text="workflows.length"></div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-blue-400 uppercase tracking-wider">Running</span>
+          <span class="flex h-2 w-2 relative">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+          </span>
+        </div>
+        <div class="mt-2 text-2xl font-bold text-blue-400" x-text="workflows.filter(w => w.status === 'RUNNING').length"></div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs font-medium text-emerald-400 uppercase tracking-wider">Completed</div>
+        <div class="mt-2 text-2xl font-bold text-emerald-400" x-text="workflows.filter(w => w.status === 'COMPLETED').length"></div>
+      </div>
+      <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
+        <div class="text-xs font-medium text-amber-400 uppercase tracking-wider">Failed / Canceled</div>
+        <div class="mt-2 text-2xl font-bold text-amber-400" x-text="workflows.filter(w => ['FAILED', 'CANCELED', 'TERMINATED', 'TIMED_OUT'].includes(w.status)).length"></div>
+      </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+      <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <!-- Search bar -->
+        <div class="relative flex-1">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input type="text" x-model="searchQuery" @input.debounce.300ms="fetchWorkflows()"
+            placeholder="Поиск по Workflow ID или типу (например BaseWorkflow.run)..."
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition">
+        </div>
+
+        <!-- Status Filter Pills -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <template x-for="st in ['ALL', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELED', 'TERMINATED']" :key="st">
+            <button @click="selectedStatus = st; fetchWorkflows()"
+              class="px-3 py-1.5 rounded-lg border font-medium transition"
+              :class="selectedStatus === st ? 'bg-purple-600 border-purple-500 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
+              x-text="st">
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- Advanced Query Collapsible -->
+      <div x-data="{ openQuery: false }" class="pt-2 border-t border-slate-800/80 text-xs">
+        <button @click="openQuery = !openQuery" class="text-slate-400 hover:text-purple-400 flex items-center space-x-1">
+          <svg class="w-3.5 h-3.5 transition-transform" :class="{'rotate-90': openQuery}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+          <span>Прямой Temporal Visibility Query (SQL-синтаксис)</span>
+        </button>
+        <div x-show="openQuery" x-cloak class="mt-2 flex gap-2">
+          <input type="text" x-model="customQuery" placeholder="ExecutionStatus='Running' AND WorkflowType='BaseWorkflow.run'"
+            class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 font-mono text-xs focus:outline-none focus:border-purple-500">
+          <button @click="fetchWorkflows()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700">
+            Применить
+          </button>
+          <button @click="customQuery = ''; fetchWorkflows()" class="px-3 py-1.5 text-slate-400 hover:text-slate-200">
+            Очистить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflows Table -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-300">
+          <thead class="bg-slate-950/70 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-800">
+            <tr>
+              <th scope="col" class="px-5 py-3.5 font-medium">Статус</th>
+              <th scope="col" class="px-5 py-3.5 font-medium">Workflow ID</th>
+              <th scope="col" class="px-5 py-3.5 font-medium">Тип воркфлоу</th>
+              <th scope="col" class="px-5 py-3.5 font-medium">Task Queue</th>
+              <th scope="col" class="px-5 py-3.5 font-medium">Время старта</th>
+              <th scope="col" class="px-5 py-3.5 font-medium text-right">Действия</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/70">
+            <!-- Loading skeleton / state -->
+            <template x-if="loading && workflows.length === 0">
+              <tr>
+                <td colspan="6" class="px-5 py-12 text-center text-slate-500">
+                  <div class="flex flex-col items-center justify-center space-y-3">
+                    <svg class="w-8 h-8 animate-spin text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Загрузка списка воркфлоу...</span>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Empty State -->
+            <template x-if="!loading && workflows.length === 0">
+              <tr>
+                <td colspan="6" class="px-5 py-12 text-center text-slate-500">
+                  <div class="flex flex-col items-center justify-center space-y-2">
+                    <svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p class="text-base font-medium text-slate-400">Воркфлоу не найдены</p>
+                    <p class="text-xs text-slate-500">Запустите новый воркфлоу по кнопке вверху или измените фильтры.</p>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Rows -->
+            <template x-for="wf in workflows" :key="wf.id + wf.run_id">
+              <tr class="hover:bg-slate-800/40 transition-colors">
+                <!-- Status Badge -->
+                <td class="px-5 py-3.5 whitespace-nowrap">
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
+                    :class="{
+                      'bg-blue-950/80 text-blue-400 border border-blue-800/50': wf.status === 'RUNNING',
+                      'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50': wf.status === 'COMPLETED',
+                      'bg-rose-950/80 text-rose-400 border border-rose-800/50': wf.status === 'FAILED',
+                      'bg-slate-800 text-slate-400 border border-slate-700': wf.status === 'CANCELED',
+                      'bg-purple-950/80 text-purple-400 border border-purple-800/50': wf.status === 'TERMINATED',
+                      'bg-amber-950/80 text-amber-400 border border-amber-800/50': wf.status === 'TIMED_OUT'
+                    }">
+                    <span x-show="wf.status === 'RUNNING'" class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping mr-1.5"></span>
+                    <span x-text="wf.status"></span>
+                  </span>
+                </td>
+
+                <!-- Workflow ID -->
+                <td class="px-5 py-3.5 font-mono text-sm">
+                  <div class="flex items-center space-x-2">
+                    <button @click="openDetailsModal(wf)" class="text-purple-400 hover:text-purple-300 font-semibold hover:underline text-left truncate max-w-xs" x-text="wf.id"></button>
+                    <button @click="copyToClipboard(wf.id)" class="text-slate-500 hover:text-slate-300" title="Скопировать ID">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="text-[11px] text-slate-500 truncate max-w-[200px]" x-text="'Run: ' + (wf.run_id ? wf.run_id.substring(0, 12) + '...' : '-')"></div>
+                </td>
+
+                <!-- Type -->
+                <td class="px-5 py-3.5 font-mono text-xs text-slate-200">
+                  <span class="bg-slate-800 px-2 py-1 rounded text-purple-300 border border-slate-700/60" x-text="wf.workflow_type"></span>
+                </td>
+
+                <!-- Task Queue -->
+                <td class="px-5 py-3.5 text-xs text-slate-400 font-mono" x-text="wf.task_queue"></td>
+
+                <!-- Start Time -->
+                <td class="px-5 py-3.5 text-xs text-slate-400">
+                  <div x-text="formatDate(wf.start_time)"></div>
+                  <div x-show="wf.close_time" class="text-[11px] text-slate-500" x-text="'Закрыт: ' + formatDate(wf.close_time)"></div>
+                </td>
+
+                <!-- Actions -->
+                <td class="px-5 py-3.5 whitespace-nowrap text-right text-xs">
+                  <div class="flex items-center justify-end space-x-1.5">
+                    <!-- Cancel Button (if Running) -->
+                    <button x-show="wf.status === 'RUNNING'" @click="cancelWorkflow(wf.id, wf.run_id)"
+                      class="px-2.5 py-1 rounded bg-amber-950/70 hover:bg-amber-900 border border-amber-700 text-amber-200 transition"
+                      title="Отменить воркфлоу">
+                      Отменить
+                    </button>
+
+                    <!-- Terminate Button (if Running) -->
+                    <button x-show="wf.status === 'RUNNING'" @click="terminateWorkflow(wf.id, wf.run_id)"
+                      class="px-2 py-1 rounded bg-rose-950/70 hover:bg-rose-900 border border-rose-700 text-rose-200 transition"
+                      title="Принудительно завершить">
+                      Завершить
+                    </button>
+
+                    <!-- Rerun Button -->
+                    <button @click="fillStartModal(wf)" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Запустить заново / склонировать параметры">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+
+                    <!-- Info Details Button -->
+                    <button @click="openDetailsModal(wf)" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="Подробнее">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ================= MODAL: START WORKFLOW ================= -->
+  <div x-show="showStartModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div @click.away="showStartModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Запуск воркфлоу</span>
+        </h3>
+        <button @click="showStartModal = false" class="text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <!-- Quick Template Buttons -->
+      <div>
+        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Пресеты</label>
+        <div class="flex gap-2">
+          <button @click="applyPreset('BaseWorkflow.run')" type="button" class="px-2.5 py-1 bg-purple-950/60 border border-purple-800/70 hover:bg-purple-900/50 text-purple-300 text-xs rounded-lg font-mono">
+            BaseWorkflow.run
+          </button>
+          <button @click="applyPreset('default')" type="button" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-mono border border-slate-700">
+            Очистить
+          </button>
+        </div>
+      </div>
+
+      <form @submit.prevent="submitStartWorkflow()" class="space-y-4">
+        <!-- Workflow Type -->
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Тип воркфлоу (Workflow Type) *</label>
+          <input type="text" x-model="startForm.workflow_type" required placeholder="например BaseWorkflow.run"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+        </div>
+
+        <!-- Workflow ID -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-medium text-slate-300">Workflow ID *</label>
+            <button type="button" @click="generateId()" class="text-xs text-purple-400 hover:underline">🎲 Сгенерировать ID</button>
+          </div>
+          <input type="text" x-model="startForm.workflow_id" required placeholder="уникальный id выполнения"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+        </div>
+
+        <!-- Task Queue -->
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Task Queue *</label>
+          <input type="text" x-model="startForm.task_queue" required placeholder="например default или my-task-queue"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+        </div>
+
+        <!-- Arguments JSON -->
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Аргументы (JSON массив, опционально)</label>
+          <textarea x-model="startForm.args_json" rows="2" placeholder='["arg1", 123] или []'
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-purple-500"></textarea>
+        </div>
+
+        <!-- Auto-cancel toggle (like user's snippet: await asyncio.sleep(2); await handle.cancel()) -->
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
+          <label class="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+            <input type="checkbox" x-model="startForm.enable_auto_cancel" class="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0">
+            <span>⏱️ Автоматически отменить воркфлоу через несколько секунд (тест отмены)</span>
+          </label>
+          <div x-show="startForm.enable_auto_cancel" x-cloak class="flex items-center space-x-2 pl-6">
+            <span class="text-xs text-slate-400">Секунд до отмены:</span>
+            <input type="number" step="0.5" min="0.5" x-model.number="startForm.cancel_after_seconds" class="w-20 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-center">
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="flex items-center justify-end space-x-3 pt-2">
+          <button type="button" @click="showStartModal = false" class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white">Отмена</button>
+          <button type="submit" :disabled="startLoading" class="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm flex items-center space-x-2 shadow-lg shadow-purple-600/30">
+            <svg x-show="startLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <span>Запустить</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: CONNECTION CONFIG & CERTS ================= -->
+  <div x-show="showConfigModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div @click.away="showConfigModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+            <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            <span>Настройки сервера и TLS сертификатов</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Укажите параметры подключения к кластеру Temporal и mTLS</p>
+        </div>
+        <button @click="showConfigModal = false" class="text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto space-y-5 pr-1 flex-1">
+        <!-- Error notification if any -->
+        <div x-show="configFormError" x-cloak class="p-3 bg-rose-950/80 border border-rose-800 rounded-lg text-rose-300 text-xs">
+          <div class="font-bold mb-1">Ошибка подключения:</div>
+          <div x-text="configFormError"></div>
+        </div>
+
+        <!-- Success notification -->
+        <div x-show="configFormSuccess" x-cloak class="p-3 bg-emerald-950/80 border border-emerald-800 rounded-lg text-emerald-300 text-xs font-medium">
+          Подключение успешно установлено и сохранено!
+        </div>
+
+        <!-- Server & Namespace -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Temporal Host / Endpoint *</label>
+            <input type="text" x-model="configData.host" placeholder="localhost:7233 или temporal.domain.com:7233" required
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+            <span class="text-[11px] text-slate-500">Например, localhost:7233</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Namespace *</label>
+            <input type="text" x-model="configData.namespace" placeholder="default" required
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono focus:outline-none focus:border-purple-500">
+            <span class="text-[11px] text-slate-500">По умолчанию: default</span>
+          </div>
+        </div>
+
+        <!-- TLS Toggle -->
+        <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="space-y-0.5">
+              <label class="text-sm font-semibold text-slate-200">Использовать TLS / mTLS шифрование</label>
+              <p class="text-xs text-slate-400">Требуется для Temporal Cloud и защищенных корпоративных кластеров</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" x-model="configData.tls_enabled" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+
+          <!-- TLS options -->
+          <div x-show="configData.tls_enabled" x-cloak class="space-y-4 pt-3 border-t border-slate-800">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Verification Server Name</label>
+                <input type="text" x-model="configData.verification_server_name" placeholder="Оставьте пустым или укажите имя"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Domain</label>
+                <input type="text" x-model="configData.domain" placeholder="Опционально"
+                  class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono">
+              </div>
+            </div>
+
+            <!-- Tabs: Files vs Text PEM -->
+            <div class="space-y-3">
+              <div class="flex border-b border-slate-800 text-xs">
+                <button type="button" @click="tlsMode = 'upload'" class="pb-2 px-3 font-medium transition border-b-2"
+                  :class="tlsMode === 'upload' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-200'">
+                  Загрузить файлы / Пути
+                </button>
+                <button type="button" @click="tlsMode = 'text'" class="pb-2 px-3 font-medium transition border-b-2"
+                  :class="tlsMode === 'text' ? 'border-purple-500 text-purple-400' : 'border-transparent text-slate-400 hover:text-slate-200'">
+                  Вставить текст сертификатов (PEM)
+                </button>
+              </div>
+
+              <!-- Upload / Path Mode -->
+              <div x-show="tlsMode === 'upload'" class="space-y-3 text-xs">
+                <!-- Cert -->
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-slate-200">1. Client Certificate (cert.pem)</span>
+                    <div class="text-[11px] text-slate-400 font-mono truncate max-w-sm" x-text="configData.certfile || 'Не указан'"></div>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span x-show="configData.has_certfile" class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">Найден</span>
+                    <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300 border border-slate-700">
+                      Загрузить .pem
+                      <input type="file" @change="uploadCertFile('cert', $event)" class="hidden">
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Key -->
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-slate-200">2. Client Private Key (key.pem)</span>
+                    <div class="text-[11px] text-slate-400 font-mono truncate max-w-sm" x-text="configData.keyfile || 'Не указан'"></div>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span x-show="configData.has_keyfile" class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">Найден</span>
+                    <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300 border border-slate-700">
+                      Загрузить .pem
+                      <input type="file" @change="uploadCertFile('key', $event)" class="hidden">
+                    </label>
+                  </div>
+                </div>
+
+                <!-- CA -->
+                <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span class="font-medium text-slate-200">3. Root CA Chain (ca-chain.pem)</span>
+                    <div class="text-[11px] text-slate-400 font-mono truncate max-w-sm" x-text="configData.ca_cert || 'Не указан'"></div>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span x-show="configData.has_ca_cert" class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">Найден</span>
+                    <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300 border border-slate-700">
+                      Загрузить .pem
+                      <input type="file" @change="uploadCertFile('ca', $event)" class="hidden">
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Text PEM Mode -->
+              <div x-show="tlsMode === 'text'" class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-slate-300 mb-1 font-medium">Client Certificate PEM (-----BEGIN CERTIFICATE-----)</label>
+                  <textarea x-model="configData.client_cert_pem" rows="3" placeholder="Вставьте текст клиентского сертификата..."
+                    class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[11px] focus:outline-none focus:border-purple-500"></textarea>
+                </div>
+                <div>
+                  <label class="block text-slate-300 mb-1 font-medium">Client Private Key PEM (-----BEGIN PRIVATE KEY-----)</label>
+                  <textarea x-model="configData.client_key_pem" rows="3" placeholder="Вставьте текст закрытого ключа..."
+                    class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[11px] focus:outline-none focus:border-purple-500"></textarea>
+                </div>
+                <div>
+                  <label class="block text-slate-300 mb-1 font-medium">Root CA Certificate PEM (опционально)</label>
+                  <textarea x-model="configData.ca_cert_pem" rows="2" placeholder="Вставьте цепочку корневого CA при необходимости..."
+                    class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[11px] focus:outline-none focus:border-purple-500"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="border-t border-slate-800 pt-3 flex items-center justify-between">
+        <span class="text-xs text-slate-500">Настройки сохраняются в secrets/connection_config.json</span>
+        <div class="flex items-center space-x-3">
+          <button type="button" @click="showConfigModal = false" class="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white">Отмена</button>
+          <button type="button" @click="saveAndConnect()" :disabled="savingConfig"
+            class="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm flex items-center space-x-2 shadow-lg shadow-purple-600/30">
+            <svg x-show="savingConfig" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <span>Сохранить и подключиться</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: WORKFLOW DETAILS ================= -->
+  <div x-show="showDetailsModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+    <div @click.away="showDetailsModal = false" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <span>Информация о воркфлоу</span>
+        </h3>
+        <button @click="showDetailsModal = false" class="text-slate-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-sm">
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Workflow ID:</span>
+          <span class="col-span-2 font-mono text-purple-300 break-all select-all" x-text="selectedWf?.id"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Run ID:</span>
+          <span class="col-span-2 font-mono text-slate-300 break-all select-all text-xs" x-text="selectedWf?.run_id"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Тип воркфлоу:</span>
+          <span class="col-span-2 font-mono text-slate-200" x-text="selectedWf?.workflow_type"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Task Queue:</span>
+          <span class="col-span-2 font-mono text-slate-300" x-text="selectedWf?.task_queue"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Статус:</span>
+          <span class="col-span-2 font-bold" x-text="selectedWf?.status"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Время старта:</span>
+          <span class="col-span-2 text-slate-300" x-text="selectedWf?.start_time ? formatDate(selectedWf.start_time) : '-'"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1 border-b border-slate-800/60">
+          <span class="text-slate-400 text-xs">Время завершения:</span>
+          <span class="col-span-2 text-slate-300" x-text="selectedWf?.close_time ? formatDate(selectedWf.close_time) : '-'"></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 py-1">
+          <span class="text-slate-400 text-xs">History Length:</span>
+          <span class="col-span-2 text-slate-300 font-mono" x-text="selectedWf?.history_length || '-'"></span>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-slate-800">
+        <button @click="showDetailsModal = false" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-lg">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm pointer-events-none">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="pointer-events-auto p-3 rounded-xl border shadow-xl flex items-start space-x-2.5 transition transform text-xs"
+        :class="t.type === 'error' ? 'bg-rose-950 border-rose-800 text-rose-200' : 'bg-slate-900 border-emerald-600/60 text-emerald-200'">
+        <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path x-show="t.type === 'error'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path x-show="t.type !== 'error'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <div class="flex-1 font-medium" x-text="t.message"></div>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function temporalDashboard() {
+      return {
+        workflows: [],
+        loading: false,
+        selectedStatus: 'ALL',
+        searchQuery: '',
+        customQuery: '',
+        autoRefreshInterval: 5,
+        timerId: null,
+
+        status: {
+          connected: false,
+          host: 'localhost:7233',
+          namespace: 'default',
+          tls_enabled: false,
+        },
+
+        // Start Modal state
+        showStartModal: false,
+        startLoading: false,
+        startForm: {
+          workflow_type: 'BaseWorkflow.run',
+          workflow_id: '',
+          task_queue: 'default',
+          args_json: '[]',
+          enable_auto_cancel: false,
+          cancel_after_seconds: 2,
+        },
+
+        // Config Modal state
+        showConfigModal: false,
+        savingConfig: false,
+        configFormError: '',
+        configFormSuccess: false,
+        tlsMode: 'upload',
+        configData: {
+          host: 'localhost:7233',
+          namespace: 'default',
+          tls_enabled: false,
+          verification_server_name: '',
+          domain: '',
+          certfile: '',
+          keyfile: '',
+          ca_cert: '',
+          has_certfile: false,
+          has_keyfile: false,
+          has_ca_cert: false,
+          client_cert_pem: '',
+          client_key_pem: '',
+          ca_cert_pem: '',
+        },
+
+        // Details Modal state
+        showDetailsModal: false,
+        selectedWf: null,
+
+        // Toasts
+        toasts: [],
+
+        init() {
+          this.generateId();
+          this.fetchStatus();
+          this.fetchWorkflows();
+          this.setupAutoRefresh();
+        },
+
+        showToast(message, type = 'info') {
+          const id = Date.now() + Math.random();
+          this.toasts.push({ id, message, type });
+          setTimeout(() => {
+            this.toasts = this.toasts.filter(t => t.id !== id);
+          }, 4500);
+        },
+
+        formatDate(isoStr) {
+          if (!isoStr) return '-';
+          try {
+            const d = new Date(isoStr);
+            return d.toLocaleString('ru-RU', {
+              day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+          } catch(e) {
+            return isoStr;
+          }
+        },
+
+        copyToClipboard(text) {
+          navigator.clipboard.writeText(text);
+          this.showToast('ID скопирован в буфер обмена');
+        },
+
+        setupAutoRefresh() {
+          if (this.timerId) {
+            clearInterval(this.timerId);
+            this.timerId = null;
+          }
+          const sec = parseInt(this.autoRefreshInterval);
+          if (sec > 0) {
+            this.timerId = setInterval(() => {
+              this.fetchStatus();
+              this.fetchWorkflows(false);
+            }, sec * 1000);
+          }
+        },
+
+        async fetchStatus() {
+          try {
+            const res = await fetch('/api/status');
+            if (res.ok) {
+              this.status = await res.json();
+            }
+          } catch (e) {
+            console.error('Failed to fetch status', e);
+          }
+        },
+
+        async fetchWorkflows(showLoader = true) {
+          if (showLoader) this.loading = true;
+          try {
+            const params = new URLSearchParams();
+            if (this.selectedStatus && this.selectedStatus !== 'ALL') {
+              params.append('status', this.selectedStatus);
+            }
+            if (this.searchQuery && this.searchQuery.trim()) {
+              params.append('search', this.searchQuery.trim());
+            }
+            if (this.customQuery && this.customQuery.trim()) {
+              params.append('query', this.customQuery.trim());
+            }
+
+            const res = await fetch('/api/workflows?' + params.toString());
+            if (res.ok) {
+              const data = await res.json();
+              this.workflows = data.workflows || [];
+            } else {
+              const err = await res.json();
+              if (showLoader) {
+                // If 503 (disconnected), do not spam toasts on automatic refresh
+                if (res.status !== 503) {
+                  this.showToast(err.detail || 'Ошибка загрузки воркфлоу', 'error');
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching workflows', e);
+          } finally {
+            if (showLoader) this.loading = false;
+          }
+        },
+
+        openStartModal() {
+          this.generateId();
+          this.showStartModal = true;
+        },
+
+        generateId() {
+          const rand = Math.random().toString(36).substring(2, 8);
+          this.startForm.workflow_id = 'wf-' + rand + '-' + Date.now().toString().slice(-4);
+        },
+
+        applyPreset(presetName) {
+          if (presetName === 'BaseWorkflow.run') {
+            this.startForm.workflow_type = 'BaseWorkflow.run';
+            this.startForm.task_queue = 'default';
+            this.startForm.args_json = '[]';
+          } else {
+            this.startForm.workflow_type = '';
+            this.startForm.task_queue = 'default';
+            this.startForm.args_json = '[]';
+          }
+          this.generateId();
+        },
+
+        fillStartModal(wf) {
+          this.startForm.workflow_type = wf.workflow_type;
+          this.startForm.task_queue = wf.task_queue;
+          this.startForm.workflow_id = wf.id + '-rerun';
+          this.showStartModal = true;
+        },
+
+        async submitStartWorkflow() {
+          let parsedArgs = [];
+          if (this.startForm.args_json && this.startForm.args_json.trim()) {
+            try {
+              parsedArgs = JSON.parse(this.startForm.args_json);
+              if (!Array.isArray(parsedArgs)) {
+                parsedArgs = [parsedArgs];
+              }
+            } catch (e) {
+              this.showToast('Ошибка в JSON аргументов: ' + e.message, 'error');
+              return;
+            }
+          }
+
+          this.startLoading = true;
+          try {
+            const body = {
+              workflow_type: this.startForm.workflow_type,
+              workflow_id: this.startForm.workflow_id,
+              task_queue: this.startForm.task_queue,
+              args: parsedArgs,
+              cancel_after_seconds: this.startForm.enable_auto_cancel ? this.startForm.cancel_after_seconds : null,
+            };
+
+            const res = await fetch('/api/workflows/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+              this.showToast('Воркфлоу успешно запущен! ID: ' + data.id);
+              this.showStartModal = false;
+              await this.fetchWorkflows();
+            } else {
+              this.showToast(data.detail || 'Не удалось запустить воркфлоу', 'error');
+            }
+          } catch (e) {
+            this.showToast('Сетевая ошибка при запуске: ' + e.message, 'error');
+          } finally {
+            this.startLoading = false;
+          }
+        },
+
+        async cancelWorkflow(id, runId) {
+          if (!confirm(`Отменить воркфлоу ${id}?`)) return;
+          try {
+            const res = await fetch(`/api/workflows/${encodeURIComponent(id)}/cancel` + (runId ? `?run_id=${runId}` : ''), {
+              method: 'POST',
+            });
+            if (res.ok) {
+              this.showToast(`Запрос отмены для ${id} отправлен`);
+              await this.fetchWorkflows();
+            } else {
+              const err = await res.json();
+              this.showToast(err.detail || 'Ошибка отмены', 'error');
+            }
+          } catch (e) {
+            this.showToast(e.message, 'error');
+          }
+        },
+
+        async terminateWorkflow(id, runId) {
+          const reason = prompt(`Причина завершения воркфлоу ${id}:`, 'Завершено пользователем из Web UI');
+          if (reason === null) return;
+          try {
+            const res = await fetch(`/api/workflows/${encodeURIComponent(id)}/terminate` + (runId ? `?run_id=${runId}` : ''), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason }),
+            });
+            if (res.ok) {
+              this.showToast(`Воркфлоу ${id} принудительно завершен`);
+              await this.fetchWorkflows();
+            } else {
+              const err = await res.json();
+              this.showToast(err.detail || 'Ошибка завершения', 'error');
+            }
+          } catch (e) {
+            this.showToast(e.message, 'error');
+          }
+        },
+
+        openDetailsModal(wf) {
+          this.selectedWf = wf;
+          this.showDetailsModal = true;
+        },
+
+        async openConfigModal() {
+          this.configFormError = '';
+          this.configFormSuccess = false;
+          try {
+            const res = await fetch('/api/config');
+            if (res.ok) {
+              this.configData = await res.json();
+            }
+          } catch (e) {
+            console.error('Failed to load config', e);
+          }
+          this.showConfigModal = true;
+        },
+
+        async uploadCertFile(certType, event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const formData = new FormData();
+          formData.append('cert_type', certType);
+          formData.append('file', file);
+
+          try {
+            const res = await fetch('/api/upload-cert', {
+              method: 'POST',
+              body: formData,
+            });
+            const data = await res.json();
+            if (res.ok) {
+              this.showToast(`Файл ${data.file} успешно загружен`);
+              if (certType === 'cert') {
+                this.configData.certfile = data.path;
+                this.configData.has_certfile = true;
+              } else if (certType === 'key') {
+                this.configData.keyfile = data.path;
+                this.configData.has_keyfile = true;
+              } else if (certType === 'ca') {
+                this.configData.ca_cert = data.path;
+                this.configData.has_ca_cert = true;
+              }
+            } else {
+              this.showToast(data.detail || 'Ошибка загрузки файла', 'error');
+            }
+          } catch (e) {
+            this.showToast(e.message, 'error');
+          }
+        },
+
+        async saveAndConnect() {
+          this.savingConfig = true;
+          this.configFormError = '';
+          this.configFormSuccess = false;
+
+          try {
+            const res = await fetch('/api/config', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.configData),
+            });
+
+            const data = await res.json();
+            if (data.connected) {
+              this.configFormSuccess = true;
+              this.showToast('Подключение успешно установлено!');
+              await this.fetchStatus();
+              await this.fetchWorkflows();
+              setTimeout(() => {
+                this.showConfigModal = false;
+              }, 1200);
+            } else {
+              this.configFormError = data.error || 'Не удалось подключиться к серверу';
+              this.showToast(this.configFormError, 'error');
+            }
+          } catch (e) {
+            this.configFormError = e.message;
+            this.showToast(e.message, 'error');
+          } finally {
+            this.savingConfig = false;
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>
